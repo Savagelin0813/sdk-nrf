@@ -44,7 +44,7 @@ jobs:
         cov-build --dir cov-int \
           west build -p \
           -d build \
-          -b nrf54l15dk_nrf54l10_cpuapp \
+          -b nrf54l15dk/nrf54l10/cpuapp \
           $APP_DIR \
           -- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSYSBUILD=OFF
 
