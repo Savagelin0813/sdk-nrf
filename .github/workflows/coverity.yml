@@ -48,12 +48,15 @@ jobs:
         tar -xzf coverity_tool.tgz -C coverity --strip-components=1
         echo "$GITHUB_WORKSPACE/coverity/bin" >> $GITHUB_PATH
 
+    - name: List folders
+      run: ls -R
+      
     - name: Build with Coverity
       run: |
         cov-build --dir cov-int \
           west build -p -b nrf54l15dk/nrf54l10/cpuapp \
           -d build \
-          -s nrf/applications/nrf_desktop \
+          -s applications/nrf_desktop \
           -- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
     - name: Submit to Coverity Scan
