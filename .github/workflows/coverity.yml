@@ -9,14 +9,25 @@ jobs:
   coverity:
     name: Run Coverity Scan
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install required packages
+    - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y build-essential curl
+        sudo apt install -y cmake ninja-build gperf \
+          python3-pip python3-setuptools python3-wheel \
+          build-essential curl git bsdiff
+
+    - name: Setup Zephyr & NCS
+      run: |
+        pip3 install west
+        west init -l .
+        west update
+        west zephyr-export
+        pip3 install -r zephyr/scripts/requirements.txt
 
     - name: Download Coverity Tool
       run: |
@@ -25,18 +36,10 @@ jobs:
           --data "token=${{ secrets.COVERITY_TOKEN }}&project=${{ secrets.COVERITY_PROJECT_NAME }}" \
           -o coverity_tool.tgz
         tar -xzf coverity_tool.tgz -C coverity --strip-components=1
+        echo "$GITHUB_WORKSPACE/coverity/bin" >> $GITHUB_PATH
 
     - name: Build with Coverity
       run: |
-        export PATH=$PATH:$GITHUB_WORKSPACE/coverity/bin
-        cov-build --dir cov-int make clean all
-
-    - name: Submit analysis
-      run: |
-        tar czvf cov-int.tgz cov-int
-        curl --form token=${{ secrets.COVERITY_TOKEN }} \
-             --form email=you@example.com \
-             --form file=@cov-int.tgz \
-             --form version="$(date +'%Y%m%d')" \
-             --form description="GitHub CI scan" \
-             https://scan.coverity.com/builds?project=${{ secrets.COVERITY_PROJECT_NAME }}
+        cov-build --dir cov-int \
+          west build -p -b nrf54l15dk/nrf54l10/cpuapp \
+          -d build \
