@@ -44,7 +44,7 @@ jobs:
         mkdir -p build_54l10
         cd build_54l10
 
-        cmake -GNinja -DBOARD=nrf54l15dk_nrf54l10_cpuapp \
+        cmake -GNinja -DBOARD=nrf54l15dk/nrf54l10/cpuapp \
               -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
               -DSYSBUILD=OFF \
               $APP_DIR
