@@ -36,18 +36,23 @@ jobs:
           -o coverity_tool.tgz
         tar -xzf coverity_tool.tgz -C coverity --strip-components=1
         echo "$GITHUB_WORKSPACE/coverity/bin" >> $GITHUB_PATH
-
+        
     - name: Build with Coverity capture
       run: |
         export PATH=$PATH:$GITHUB_WORKSPACE/coverity/bin
         export APP_DIR=$GITHUB_WORKSPACE/applications/nrf_desktop
-        cov-build --dir cov-int \
-          west build -p \
-          -d build \
-          -b nrf54l15dk/nrf54l10/cpuapp \
-          $APP_DIR \
-          -- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSYSBUILD=OFF
+        mkdir -p build_54l10
+        cd build_54l10
 
+        cmake -GNinja -DBOARD=nrf54l15dk_nrf54l10_cpuapp \
+              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+              -DSYSBUILD=OFF \
+              $APP_DIR
+
+        cd ..
+        cov-build --dir cov-int ninja -C build_54l10
+
+   
     - name: Compress results
       run: tar czvf cov-int.tgz cov-int || true
 
