@@ -47,10 +47,10 @@ jobs:
         run: |
           export PATH=$PATH:$GITHUB_WORKSPACE/coverity/bin
           cov-build --dir cov-int \
-            west build -p -b nrf54l15dk/nrf54l10/cpuapp \
-            -d build_54l10 \
-            -s applications/nrf_desktop \
-            -- -DSYSBUILD=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          west build -p -b nrf54l15dk/nrf54l10/cpuapp \
+          -d build_54l10 \
+          -s applications/nrf_desktop \
+          -- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Submit Coverity scan
         run: |
