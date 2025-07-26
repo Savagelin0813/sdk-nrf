@@ -1,6 +1,9 @@
 nRF Connect SDK: sdk-nrf
 ########################
-
+<a href="https://scan.coverity.com/projects/savagegraden">
+  <img alt="Coverity Scan Build Status"
+       src="https://scan.coverity.com/projects/32103/badge.svg"/>
+</a>
 .. contents::
    :local:
    :depth: 2
