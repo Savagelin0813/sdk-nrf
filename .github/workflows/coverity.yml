@@ -1,80 +1,63 @@
 name: Coverity Scan
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   coverity:
-    name: Run Coverity Scan
     runs-on: ubuntu-latest
 
+    env:
+      ZEPHYR_TOOLCHAIN_VARIANT: zephyr
+      ZEPHYR_SDK_INSTALL_DIR: ${{ github.workspace }}/zephyr-sdk
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y build-essential cmake ninja-build gperf \
-          python3-pip python3-setuptools python3-wheel git curl
-        pip3 install west
-        pip3 install -r scripts/requirements.txt
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y ninja-build cmake gperf ccache dfu-util \
+            device-tree-compiler wget xz-utils python3-pip
+          pip3 install west
+          west init -l .
+          west update
+          west zephyr-export
 
-    - name: Initialize NCS workspace
-      run: |
-        west init -l .
-        west update
-        west zephyr-export
-        
-    - name: Install Zephyr SDK
-      run: |
-        wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.4/zephyr-sdk-0.16.4_linux-x86_64.tar.xz
-        tar xvf zephyr-sdk-0.16.4_linux-x86_64.tar.xz
-        mv zephyr-sdk-0.16.4 $HOME/zephyr-sdk
-        $HOME/zephyr-sdk/setup.sh -t all -h
-        
-    - name: Download Coverity tool
-      run: |
-        mkdir coverity
-        curl -L "https://scan.coverity.com/download/linux64" \
-          --data "token=${{ secrets.COVERITY_TOKEN }}&project=${{ secrets.COVERITY_PROJECT_NAME }}" \
-          -o coverity_tool.tgz
-        tar -xzf coverity_tool.tgz -C coverity --strip-components=1
-        echo "$GITHUB_WORKSPACE/coverity/bin" >> $GITHUB_PATH
+      - name: Install Zephyr SDK
+        run: |
+          wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.4/zephyr-sdk-0.16.4_linux-x86_64.tar.xz
+          tar -xf zephyr-sdk-0.16.4_linux-x86_64.tar.xz
+          mv zephyr-sdk-0.16.4 zephyr-sdk
 
-    - name: Build with Coverity capture
-      run: |
-        export PATH=$PATH:$GITHUB_WORKSPACE/coverity/bin
-        export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
-        export ZEPHYR_SDK_INSTALL_DIR=$HOME/zephyr-sdk
-        mkdir -p build_54l10
-        cd build_54l10
-        cmake -GNinja -DBOARD=nrf54l15dk/nrf54l10/cpuapp \
-              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-              -DSYSBUILD=OFF \
-              ../applications/nrf_desktop
-        cd ..
-        cov-build --dir cov-int ninja -C build_54l10
-  
+      - name: Download Coverity tool
+        run: |
+          mkdir coverity
+          curl -L "https://scan.coverity.com/download/linux64" \
+            --data "token=${{ secrets.COVERITY_TOKEN }}&project=${{ secrets.COVERITY_PROJECT_NAME }}" \
+            -o coverity_tool.tgz
+          tar -xzf coverity_tool.tgz -C coverity --strip-components=1
 
-   
-    - name: Compress results
-      run: tar czvf cov-int.tgz cov-int || true
+      - name: Run Coverity build capture
+        run: |
+          export PATH=$PATH:$GITHUB_WORKSPACE/coverity/bin
+          cov-build --dir cov-int \
+            west build -p -b nrf54l15dk/nrf54l10/cpuapp \
+            -d build_54l10 \
+            -s applications/nrf_desktop \
+            -- -DSYSBUILD=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-    - name: Upload build log (for debug)
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverity-build-log
-        path: cov-int/build-log.txt
-
-    - name: Submit analysis to Coverity
-      run: |
-        curl --form token=${{ secrets.COVERITY_TOKEN }} \
-             --form email=savage.lin@gmail.com \
-             --form file=@cov-int.tgz \
-             --form version="ncs-$(date +'%Y%m%d')" \
-             --form description="NCS project CI Coverity scan" \
-             https://scan.coverity.com/builds?project=${{ secrets.COVERITY_PROJECT_NAME }}
+      - name: Submit Coverity scan
+        run: |
+          tar czvf cov-int.tgz cov-int
+          curl --form token=${{ secrets.COVERITY_TOKEN }} \
+               --form email=savage.lin@gmail.com \
+               --form file=@cov-int.tgz \
+               --form version="nrf_desktop_$(date +'%Y%m%d')" \
+               --form description="Automated Coverity scan" \
+               https://scan.coverity.com/builds?project=${{ secrets.COVERITY_PROJECT_NAME }}
