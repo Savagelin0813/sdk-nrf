@@ -14,24 +14,34 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Cache west & modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          .west
+          modules
+          zephyr
+          tools
+        key: ${{ runner.os }}-west-${{ hashFiles('west.yml') }}
+
     - name: Install dependencies
       run: |
         sudo apt update
         sudo apt install -y cmake ninja-build gperf \
           python3-pip python3-setuptools python3-wheel \
-          build-essential curl git bsdiff
+          build-essential curl git
 
     - name: Setup Zephyr & NCS
       run: |
         pip3 install west
-        west init -l .
+        west init .
         west update
         west zephyr-export
         pip3 install -r zephyr/scripts/requirements.txt
 
     - name: Download Coverity Tool
       run: |
-        mkdir coverity
+        mkdir -p coverity
         curl -L "https://scan.coverity.com/download/linux64" \
           --data "token=${{ secrets.COVERITY_TOKEN }}&project=${{ secrets.COVERITY_PROJECT_NAME }}" \
           -o coverity_tool.tgz
@@ -43,3 +53,9 @@ jobs:
         cov-build --dir cov-int \
           west build -p -b nrf54l15dk/nrf54l10/cpuapp \
           -d build \
+          -s nrf/applications/nrf_desktop \
+          -- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+    - name: Submit to Coverity Scan
+      run: |
+        tar czvf
