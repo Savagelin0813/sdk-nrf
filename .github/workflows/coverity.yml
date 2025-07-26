@@ -3,61 +3,64 @@ name: Coverity Scan
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   coverity:
     runs-on: ubuntu-latest
 
-    env:
-      ZEPHYR_TOOLCHAIN_VARIANT: zephyr
-      ZEPHYR_SDK_INSTALL_DIR: ${{ github.workspace }}/zephyr-sdk
-
     steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build cmake gperf ccache dfu-util \
-            device-tree-compiler wget xz-utils python3-pip
-          pip3 install west
-          west init -l .
-          west update
-          west zephyr-export
+    - name: Install required packages
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential curl python3-pip cmake ninja-build
 
-      - name: Install Zephyr SDK
-        run: |
-          wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.4/zephyr-sdk-0.16.4_linux-x86_64.tar.xz
-          tar -xf zephyr-sdk-0.16.4_linux-x86_64.tar.xz
-          mv zephyr-sdk-0.16.4 zephyr-sdk
+    - name: Install west and Zephyr SDK
+      run: |
+        pip3 install west
+        west init -l .
+        west update
+        west zephyr-export
 
-      - name: Download Coverity tool
-        run: |
-          mkdir coverity
-          curl -L "https://scan.coverity.com/download/linux64" \
-            --data "token=${{ secrets.COVERITY_TOKEN }}&project=${{ secrets.COVERITY_PROJECT_NAME }}" \
-            -o coverity_tool.tgz
-          tar -xzf coverity_tool.tgz -C coverity --strip-components=1
+        wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.4/zephyr-sdk-0.16.4_linux-x86_64.tar.xz
+        tar -xf zephyr-sdk-0.16.4_linux-x86_64.tar.xz
+        mv zephyr-sdk-0.16.4 ~/zephyr-sdk
+        export ZEPHYR_SDK_INSTALL_DIR=$HOME/zephyr-sdk
 
-      - name: Run Coverity build capture
-        run: |
-          export PATH=$PATH:$GITHUB_WORKSPACE/coverity/bin
-          cov-build --dir cov-int \
-          west build -p -b nrf54l15dk/nrf54l10/cpuapp \
+    - name: Download Coverity tool
+      run: |
+        mkdir coverity
+        curl -L "https://scan.coverity.com/download/linux64" \
+          --data "token=${{ secrets.COVERITY_TOKEN }}&project=${{ secrets.COVERITY_PROJECT_NAME }}" \
+          -o coverity_tool.tgz
+        tar -xzf coverity_tool.tgz -C coverity --strip-components=1
+
+    - name: Build project (Zephyr)
+      env:
+        ZEPHYR_TOOLCHAIN_VARIANT: zephyr
+        ZEPHYR_SDK_INSTALL_DIR: $HOME/zephyr-sdk
+      run: |
+        export PATH=$PATH:$GITHUB_WORKSPACE/coverity/bin
+        west build -p -b nrf54l15dk/nrf54l10/cpuapp \
           -d build_54l10 \
           -s applications/nrf_desktop \
           -- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-      - name: Submit Coverity scan
-        run: |
-          tar czvf cov-int.tgz cov-int
-          curl --form token=${{ secrets.COVERITY_TOKEN }} \
-               --form email=savage.lin@gmail.com \
-               --form file=@cov-int.tgz \
-               --form version="nrf_desktop_$(date +'%Y%m%d')" \
-               --form description="Automated Coverity scan" \
-               https://scan.coverity.com/builds?project=${{ secrets.COVERITY_PROJECT_NAME }}
+    - name: Coverity capture from compile_commands.json
+      run: |
+        export PATH=$PATH:$GITHUB_WORKSPACE/coverity/bin
+        cov-build --dir cov-int --parse-compiler-commands build_54l10/compile_commands.json
+
+    - name: Submit analysis to Coverity
+      run: |
+        tar czvf cov-int.tgz cov-int
+        curl --form token=${{ secrets.COVERITY_TOKEN }} \
+             --form email=savage.lin@gmail.com \
+             --form file=@cov-int.tgz \
+             --form version="$(date +'%Y%m%d_%H%M')" \
+             --form description="Auto scan from GitHub Actions" \
+             https://scan.coverity.com/builds?project=${{ secrets.COVERITY_PROJECT_NAME }}
