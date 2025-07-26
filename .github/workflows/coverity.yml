@@ -57,8 +57,7 @@ jobs:
           west build -p -b nrf54l15dk/nrf54l10/cpuapp \
           -d build \
           -s applications/nrf_desktop \
-          -- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-
+          -- -DSYSBUILD=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     - name: Submit to Coverity Scan
       run: |
         tar czvf
