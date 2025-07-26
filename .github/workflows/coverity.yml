@@ -34,7 +34,7 @@ jobs:
     - name: Setup Zephyr & NCS
       run: |
         pip3 install west
-        west init .
+        west init -l .
         west update
         west zephyr-export
         pip3 install -r zephyr/scripts/requirements.txt
