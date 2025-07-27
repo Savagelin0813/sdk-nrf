@@ -1,0 +1,73 @@
+name: Coverity Static Analysis
+
+on:
+  workflow_dispatch:
+
+jobs:
+  coverity-analysis:
+    runs-on: self-hosted
+
+    env:
+      COVERITY_TOKEN: -edvuwpN9qmO17W-vkzC9A
+      COVERITY_EMAIL: savage.lin@gmail.com
+      COVERITY_PROJECT: SavageGraden
+      COVERITY_DIR: /opt/coverity
+      ZEPHYR_BASE: ~/ncs/zephyr
+      ZEPHYR_TOOLCHAIN_VARIANT: zephyr
+      ZEPHYR_SDK_INSTALL_DIR: /opt/zephyr-sdk/
+      VENV_PATH: ~/.ncs/.venv/bin
+      BUILD_DIR: build_coverity
+      COV_INT_DIR: cov-int
+      TAR_NAME: coverity_analysis_output.tgz
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Run Coverity capture
+        run: |
+          ${COVERITY_DIR}/bin/coverity capture \
+            --dir ${COV_INT_DIR} \
+            --project-dir . \
+            -- ./build_with_west.sh
+
+      - name: Run Coverity analyze
+        run: |
+          ${COVERITY_DIR}/bin/coverity analyze \
+            --project-dir . \
+            --dir ${COV_INT_DIR}
+
+      - name: Create tarball
+        run: |
+          tar -czf ${TAR_NAME} ${COV_INT_DIR}
+
+      - name: Upload to Coverity SCAN - Init
+        run: |
+          curl -X POST \
+            -d version="CI Auto Upload $(date +%Y%m%d_%H%M)" \
+            -d description="Automated upload from GitHub Action" \
+            -d email="${COVERITY_EMAIL}" \
+            -d token="${COVERITY_TOKEN}" \
+            -d file_name="${TAR_NAME}" \
+            https://scan.coverity.com/projects/32103/builds/init \
+            -o response.json
+
+      - name: Extract upload_url and build_id
+        run: |
+          upload_url=$(jq -r '.url' response.json)
+          build_id=$(jq -r '.build_id' response.json)
+          echo "UPLOAD_URL=${upload_url}" >> $GITHUB_ENV
+          echo "BUILD_ID=${build_id}" >> $GITHUB_ENV
+
+      - name: Upload tarball to Coverity SCAN
+        run: |
+          curl -X PUT \
+            --header 'Content-Type: application/json' \
+            --upload-file ${TAR_NAME} \
+            "${UPLOAD_URL}"
+
+      - name: Enqueue Coverity Build
+        run: |
+          curl -X PUT \
+            -d token="${COVERITY_TOKEN}" \
+            https://scan.coverity.com/projects/32103/builds/${BUILD_ID}/enqueue
