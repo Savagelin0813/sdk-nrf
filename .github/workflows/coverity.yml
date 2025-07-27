@@ -29,8 +29,7 @@ jobs:
           ${COVERITY_DIR}/bin/coverity capture \
             --dir ${COV_INT_DIR} \
             --project-dir . \
-            -- ./build_with_west.sh
-
+            -- ./home/fred/ncs/nrf/applications/nrf_desktop/build_cov_with_west.sh
       - name: Run Coverity analyze
         run: |
           ${COVERITY_DIR}/bin/coverity analyze \
